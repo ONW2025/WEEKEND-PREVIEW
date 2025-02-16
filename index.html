@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draggable Ohio Cities with Temp, Icon & POP Forecasts</title>
+  <!-- Include html2canvas from a CDN for saving -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    /* Reset and force full viewport */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    /* Container with fixed (design) resolution */
+    #container {
+      position: absolute;
+      width: 1620px;  /* design width */
+      height: 780px;  /* design height */
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: top left;
+    }
+    /* Background image applied via a pseudo‑element so it scales with the container */
+    #container::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1620px;
+      height: 780px;
+      background-image: url('WEEKEND PREVIEW.PNG'); /* Replace with your image */
+      background-size: 100% 100%; /* Force the image to fill the container */
+      background-repeat: no-repeat;
+      background-position: center;
+      z-index: -1;
+    }
+    /* Date Header - adjust these values to change the position */
+    #date-header {
+      position: absolute;
+      top: 59px;    /* Change this to adjust vertical position */
+      left: 29%;    /* Change this to adjust horizontal position */
+      transform: translateX(-50%);
+      font-family: 'Overpass Black', sans-serif;
+      font-size: 32px;
+      color: #fff;
+      text-shadow: 0 0 5px #000, 0 0 10px #000;
+      z-index: 11000;
+    }
+    /* Global Tooltip */
+    .tooltip {
+      position: absolute;
+      background-color: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      pointer-events: none;
+      display: none;
+      z-index: 10000;
+    }
+    /* Draggable city container */
+    .city {
+      position: absolute;
+      cursor: move;
+      padding: 5px;
+      user-select: none;
+      z-index: 500;
+      width: 400px; /* Fixed width for alignment */
+      transform: translateX(-50%);
+      text-align: center;
+    }
+    .city:hover {
+      z-index: 10000;
+    }
+    /* City header styling */
+    .city-header {
+      width: 100%;
+      text-align: center;
+      font-family: 'Overpass Black', sans-serif;
+      font-size: 36px;
+      color: #FFF;
+      text-shadow: 0 0 5px #000, 0 0 10px #000, 0 0 20px #000;
+    }
+    .city-header .city-name {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    /* Global dropdown container – fixed width to match .city */
+    #main-dropdown {
+      display: none;
+      position: absolute;
+      width: 200px;
+      text-align: left;
+      background-color: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      padding: 5px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 11000;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    /* Dropdown items – left aligned */
+    .dropdown-item {
+      padding: 3px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 14px;
+      text-transform: uppercase;
+      text-align: left;
+    }
+    .dropdown-item:hover {
+      background-color: #ddd;
+    }
+    /* Custom positions for the 8 draggable city elements */
+    .city1 { top: 98.7863px; left: 228.45px; }
+    .city2 { top: 98.7863px; left: 606.594px; }
+    .city3 { top: 98.7863px; left: 986.768px; }
+    .city4 { top: 98.7863px; left: 1363.03px; }
+    .city5 { top: 437.997px; left: 228.45px; }
+    .city6 { top: 437.997px; left: 606.594px; }
+    .city7 { top: 437.997px; left: 986.768px; }
+    .city8 { top: 437.997px; left: 1363.03px; }
+    /* Styling for day boxes */
+    .day-box {
+      position: absolute;
+      padding: 6px 10px;
+      font-size: 20px;
+      font-family: 'Overpass Black', sans-serif;
+      color: #FFF;
+      background: transparent;
+      border: 0;
+      text-transform: uppercase;
+      cursor: move;
+      z-index: 6000;
+      min-width: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      transform: translateX(-50%);
+    }
+    /* Styling for temperature boxes */
+    .temp-box {
+      position: absolute;
+      padding: 0px 10px;
+      font-size: 65px;
+      font-family: 'Overpass Black', sans-serif;
+      color: #ffff00;
+      background: transparent;
+      border: 0;
+      text-transform: uppercase;
+      cursor: move;
+      z-index: 6000;
+      min-width: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      transform: translateX(-50%);
+    }
+    .temp-value {
+      pointer-events: none;
+    }
+    /* Glow customization */
+    .glow1 {
+      text-shadow: 0 0 5px #000, 0 0 10px #000;
+    }
+    .glow2 {
+      text-shadow: 0 0 5px #000, 0 0 10px #000;
+    }
+    .glow3 {
+      text-shadow: 0 0 5px #000, 0 0 10px #000;
+    }
+    /* Styling for icon boxes */
+    .icon-box {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      cursor: move;
+      z-index: 6000;
+      border: 1px solid transparent;
+    }
+    .icon-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    /* Styling for the icon dropdown */
+    .icon-dropdown {
+      position: absolute;
+      display: none;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 12000;
+      font-size: 12px;
+      text-transform: none;
+      width: 120px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .icon-dropdown .icon-dropdown-item {
+      padding: 3px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .icon-dropdown .icon-dropdown-item:hover {
+      background: #ddd;
+    }
+    .icon-box:hover .icon-dropdown {
+      display: block;
+    }
+    /* Styling for POP boxes */
+    .pop-box {
+      position: absolute;
+      padding: 6px 10px;
+      font-size: 27px;
+      font-family: 'Overpass Black', sans-serif;
+      color: #00ff00;
+      text-shadow: 0 0 5px #000, 0 0 10px #000;
+      background: transparent;
+      border: 0;
+      text-transform: uppercase;
+      cursor: move;
+      z-index: 6000;
+      min-width: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      transform: translateX(-50%);
+    }
+  </style>
+</head>
+<body>
+  <!-- All page elements are now wrapped in #container -->
+  <div id="container">
+    <!-- Date Header -->
+    <div id="date-header"></div>
+    <!-- Global Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+    <!-- Global Main Dropdown -->
+    <div id="main-dropdown">
+      <div class="dropdown-item">akron</div>
+      <div class="dropdown-item">ashtabula</div>
+      <div class="dropdown-item">athens</div>
+      <div class="dropdown-item">celina</div>
+      <div class="dropdown-item">chillicothe</div>
+      <div class="dropdown-item">cirlceville</div>
+      <div class="dropdown-item">cincinnati</div>
+      <div class="dropdown-item">celeveland</div>
+      <div class="dropdown-item">columbus</div>
+      <div class="dropdown-item">dayton</div>
+      <div class="dropdown-item">delaware</div>
+      <div class="dropdown-item">defiance</div>
+      <div class="dropdown-item">elryria</div>
+      <div class="dropdown-item">gallipolis</div>
+      <div class="dropdown-item">findlay</div>
+      <div class="dropdown-item">jackson</div>
+      <div class="dropdown-item">lancaster</div>
+      <div class="dropdown-item">luckey</div>
+      <div class="dropdown-item">lorain</div>
+      <div class="dropdown-item">lima</div>
+      <div class="dropdown-item">logan</div>
+      <div class="dropdown-item">mansfield</div>
+      <div class="dropdown-item">marion</div>
+      <div class="dropdown-item">newark</div>
+      <div class="dropdown-item">portsmouth</div>
+      <div class="dropdown-item">sandusky</div>
+      <div class="dropdown-item">tiffin</div>
+      <div class="dropdown-item">toledo</div>
+      <div class="dropdown-item">washington</div>
+      <div class="dropdown-item">court house</div>
+      <div class="dropdown-item">youngstown</div>
+      <div class="dropdown-item">zanesville</div>
+    </div>
+    <!-- Draggable city elements -->
+    <div class="city city1">
+      <div class="city-header">
+        <span class="city-name">akron</span>
+      </div>
+    </div>
+    <div class="city city2">
+      <div class="city-header">
+        <span class="city-name">ashtabula</span>
+      </div>
+    </div>
+    <div class="city city3">
+      <div class="city-header">
+        <span class="city-name">athens</span>
+      </div>
+    </div>
+    <div class="city city4">
+      <div class="city-header">
+        <span class="city-name">celina</span>
+      </div>
+    </div>
+    <div class="city city5">
+      <div class="city-header">
+        <span class="city-name">chillicothe</span>
+      </div>
+    </div>
+    <div class="city city6">
+      <div class="city-header">
+        <span class="city-name">cirlceville</span>
+      </div>
+    </div>
+    <div class="city city7">
+      <div class="city-header">
+        <span class="city-name">cincinnati</span>
+      </div>
+    </div>
+    <div class="city city8">
+      <div class="city-header">
+        <span class="city-name">celeveland</span>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Global variable to hold the current scale factor.
+    let currentScale = 1;
+    function scaleContainer() {
+      const container = document.getElementById('container');
+      const designWidth = 1700;
+      const designHeight = 900;
+      const scaleX = window.innerWidth / designWidth;
+      const scaleY = window.innerHeight / designHeight;
+      currentScale = Math.min(scaleX, scaleY);
+      container.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+    }
+    window.addEventListener('resize', scaleContainer);
+    scaleContainer();
+    
+    // Helper function to get ordinal suffix (st, nd, rd, th)
+    function getOrdinalSuffix(day) {
+      if (day > 3 && day < 21) return "th";
+      switch (day % 10) {
+        case 1: return "st";
+        case 2: return "nd";
+        case 3: return "rd";
+        default: return "th";
+      }
+    }
+    
+    // Function to update the date header with a two-day span.
+    function updateDateHeader() {
+      const header = document.getElementById('date-header');
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      const month = now.toLocaleString('default', { month: 'long' });
+      const day1 = now.getDate();
+      const day2 = tomorrow.getDate();
+      const year = now.getFullYear();
+      header.textContent = `${month} ${day1}${getOrdinalSuffix(day1)}-${day2}${getOrdinalSuffix(day2)}, ${year}`;
+    }
+    // Update date header on load and every minute.
+    updateDateHeader();
+    setInterval(updateDateHeader, 60000);
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      let currentCityId = null;
+      const container = document.getElementById('container');
+      const cityCoordinates = {
+        "city1": { lat: 41.0814, lon: -81.5190 },
+        "city2": { lat: 41.8663, lon: -78.6690 },
+        "city3": { lat: 39.3299, lon: -82.1013 },
+        "city4": { lat: 40.7537, lon: -84.4500 },
+        "city5": { lat: 39.3333, lon: -82.9833 },
+        "city6": { lat: 39.696, lon: -82.984 },
+        "city7": { lat: 39.1031, lon: -84.5120 },
+        "city8": { lat: 41.4993, lon: -81.6944 }
+      };
+      const availableCityCoordinates = {
+        "akron":        { lat: 41.0814, lon: -81.5190 },
+        "ashtabula":    { lat: 41.8663, lon: -78.6690 },
+        "athens":       { lat: 39.3299, lon: -82.1013 },
+        "celina":       { lat: 40.7537, lon: -84.4500 },
+        "chillicothe":  { lat: 39.3333, lon: -82.9833 },
+        "cirlceville":  { lat: 39.696,  lon: -82.984 },
+        "cincinnati":   { lat: 39.1031, lon: -84.5120 },
+        "celeveland":   { lat: 41.4993, lon: -81.6944 },
+        "columbus":     { lat: 39.9612, lon: -82.9988 },
+        "dayton":       { lat: 39.7589, lon: -84.1916 },
+        "delaware":     { lat: 40.2989, lon: -83.0790 },
+        "defiance":     { lat: 41.2819, lon: -84.2763 },
+        "elryria":      { lat: 39.8830, lon: -84.1210 },
+        "gallipolis":   { lat: 38.7337, lon: -82.2192 },
+        "findlay":      { lat: 41.0440, lon: -83.6497 },
+        "jackson":      { lat: 39.6550, lon: -82.6270 },
+        "lancaster":    { lat: 40.0379, lon: -82.4041 },
+        "luckey":       { lat: 41.5000, lon: -82.5000 },
+        "lorain":       { lat: 41.4528, lon: -82.1909 },
+        "lima":         { lat: 40.7426, lon: -84.1052 },
+        "logan":        { lat: 40.3892, lon: -83.1006 },
+        "mansfield":    { lat: 40.7584, lon: -82.5154 },
+        "marion":       { lat: 40.5883, lon: -83.1819 },
+        "newark":       { lat: 40.0583, lon: -82.4013 },
+        "portsmouth":   { lat: 38.7584, lon: -82.4753 },
+        "sandusky":     { lat: 41.4489, lon: -82.7072 },
+        "tiffin":       { lat: 41.1295, lon: -83.1786 },
+        "toledo":       { lat: 41.6528, lon: -83.5379 },
+        "washington":   { lat: 40.1135, lon: -80.6248 },
+        "court house":  { lat: 39.9612, lon: -83.0000 },
+        "youngstown":   { lat: 41.0998, lon: -80.6495 },
+        "zanesville":   { lat: 39.9400, lon: -82.0132 }
+      };
+
+      const customIconMapping = {
+        "sunny": "sunny.png",
+        "mostly sunny": "partly-cloudy.png",
+        "partly sunny": "mostly-cloudy.png",
+        "mostly cloudy": "mostly-cloudy.png",
+        "partly cloudy": "partly-cloudy.png",
+        "cloudy": "cloudy.png",
+        "clear": "sunny.png",
+        "mostly clear": "partly-cloudy.png",
+        "fog": "foggy.png",
+        "drizzle": "drizzle.png",
+        "rain": "rain.png",
+        "thunder": "thunderstorm.png",
+        "snow": "snow.png",
+        "sleet": "wintry-mix.png",
+        "increasing clouds": "mostly-cloudy.png",
+        "becoming cloudy": "mostly-cloudy.png",
+        "clearing": "partly-cloudy.png",
+        "gradual clearing": "mostly-cloudy.png",
+        "clearing late": "partly-cloudy.png",
+        "decreasing clouds": "partly-cloudy.png",
+        "becoming sunny": "sunny.png",
+        "hot": "hot.png",
+        "cold": "cloudy.png",
+        "blustery": "windy.png",
+        "windy": "windy.png",
+        "very windy": "windy.png",
+        "damaging winds": "windy.png",
+        "blowing snow": "windy.png",
+        "isolated haze": "haze.png",
+        "isolated smoke": "smoke.png",
+        "isolated fog": "foggy.png",
+        "isolated freezing fog": "freezing-fog.png",
+        "isolated frost": "sunny.png",
+        "areas haze": "haze.png",
+        "areas smoke": "smoke.png",
+        "areas fog": "foggy.png",
+        "areas freezing fog": "freezing-fog.png",
+        "areas frost": "sunny.png",
+        "patchy haze": "haze.png",
+        "patchy smoke": "smoke.png",
+        "patchy fog": "foggy.png",
+        "patchy freezing fog": "freezing-fog.png",
+        "patchy frost": "sunny.png",
+        "haze": "haze.png",
+        "smoke": "smoke.png",
+        "fog": "foggy.png",
+        "freezing fog": "freezing-fog.png",
+        "frost": "sunny.png",
+        "dense freezing fog": "freezing-fog.png",
+        "dense fog": "foggy.png",
+        "morning frost": "sunny.png",
+        "isolated t-storms": "thunderstorm.png",
+        "slight chance t-storms": "thunderstorm.png",
+        "scattered t-storms": "thunderstorm.png",
+        "area t-storms": "thunderstorm.png",
+        "chance t-storms": "thunderstorm.png",
+        "t-storms likely": "thundestorm.png",
+        "t-storms": "thunderstorm.png",
+        "severe t-storms": "severe.png",
+        "isolated sprinkles": "drizzle.png",
+        "isolated rain": "rain.png",
+        "isolated drizzle": "drizzle.png",
+        "isolated showers": "rain.png",
+        "scattered sprinkles": "drizzle.png",
+        "scattered rain": "rain.png",
+        "scattered drizzle": "drizzle.png",
+        "scattered showers": "rain.png",
+        "slight chance sprinkles": "drizzle.png",
+        "slight chance rain": "rain.png",
+        "slight chance drizzle": "drizzle.png",
+        "slight chance showers": "rain.png",
+        "areas sprinkles": "drizzle.png",
+        "areas rain": "rain.png",
+        "areas drizzle": "drizzle.png",
+        "areas showers": "rain.png",
+        "chance sprinkles": "drizzle.png",
+        "chance rain": "rain.png",
+        "chance drizzle": "drizzle.png",
+        "chance showers": "rain.png",
+        "sprinkles likely": "drizzle.png",
+        "rain likely": "rain.png",
+        "drizzle likely": "drizzle.png",
+        "showers likely": "rain.png",
+        "sprinkles": "drizzle.png",
+        "rain": "rain.png",
+        "drizzle": "drizzle.png",
+        "showers": "rain.png",
+        "heavy rain": "heavy-rain.png",
+        "slight chance light snow": "snow.png",
+        "slight chance snow": "snow.png",
+        "slight chance flurries": "snow-showers.png",
+        "areas chance light snow": "snow.png",
+        "areas chance snow": "snow.png",
+        "areas chance flurries": "snow-showers.png",
+        "chance light snow": "snow.png",
+        "chance snow": "snow.png",
+        "chance flurries": "snow-showers.png",
+        "light snow likely": "snow-showers.png",
+        "snow likely": "snow.png",
+        "flurries likely": "snow-showers.png",
+        "light snow": "snow.png",
+        "snow": "snow.png",
+        "flurries": "flurries.png",
+        "heavy snow": "heavy-snow.png",
+        "chance freezing rain": "freezing-rain.png",
+        "chance freezing drizzle": "freezing-drizzle.png",
+        "slight chance freezing rain": "freezing-rain.png",
+        "slight chance freezing drizzle": "freezing-drizzle.png",
+        "areas freezing rain": "freezing-rain.png",
+        "areas freezing drizzle": "freezing-drizzle.png",
+        "freezing rain likely": "freezing-rain.png",
+        "freezing drizzle likely": "freezing-drizzle.png",
+        "freezing rain": "freezing-rain.png",
+        "freezing drizzle": "freezing-drizzle.png",
+        "wintry mix": "wintry-mix.png",
+        "snow/sleet": "freezing-drizzle.png"
+      };
+
+      const defaultIcon = "default.png";
+      const overrideIcons = [
+        'sunny.png', 'cloudy.png', 'rain.png', 'thunderstorm.png', 'snow.png',
+        'foggy.png', 'windy.png', 'haze.png', 'partly-cloudy.png', 'hot.png',
+        'hot-and-cloudy.png', 'sunshine-and-rain.png', 'severe.png',
+        'heavy-rain.png', 'heavy-snow.png', 'snow-showers.png', 'wintry-mix.png',
+        'drizzle.png', 'mostly-cloudy.png', 'freezing-rain.png'
+      ];
+
+      const iconBoxManualPositions = {
+        "city1": [ { left: 88.1275, top: 199.162 }, { left: 261.272, top: 199.162 } ],
+        "city2": [ { left: 468.547, top: 199.162 }, { left: 638.48, top: 199.162 } ],
+        "city3": [ { left: 847.342, top: 199.162 }, { left: 1021.91, top: 199.162 } ],
+        "city4": [ { left: 1228.15, top: 199.162 }, { left: 1400.24, top: 199.162 } ],
+        "city5": [ { left: 88.1275, top: 541.208 }, { left: 261.272, top: 541.208 } ],
+        "city6": [ { left: 468.547, top: 541.208 }, { left: 638.48, top: 541.208 } ],
+        "city7": [ { left: 847.342, top: 541.208 }, { left: 1021.91, top: 541.208 } ],
+        "city8": [ { left: 1228.15, top: 541.208 }, { left: 1400.24, top: 541.208 } ]
+      };
+
+      const tempBoxPositions = {
+        "city1": [ { left: 140.145, top: 337.24 }, { left: 313.568, top: 337.24 } ],
+        "city2": [ { left: 516.143, top: 337.24 }, { left: 685.879, top: 337.24 } ],
+        "city3": [ { left: 898.267, top: 337.24 }, { left: 1069.5, top: 337.24 } ],
+        "city4": [ { left: 1282.8, top: 337.24 }, { left: 1449.21, top: 337.24 } ],
+        "city5": [ { left: 140.145, top: 676.991 }, { left: 313.568, top: 676.991 } ],
+        "city6": [ { left: 516.143, top: 676.991 }, { left: 685.879, top: 676.991 } ],
+        "city7": [ { left: 898.267, top: 676.991 }, { left: 1069.5, top: 676.991 } ],
+        "city8": [ { left: 1282.8, top: 676.991 }, { left: 1449.21, top: 676.991 } ]
+      };
+
+      const iconBoxPositions = {};
+      for (let city in tempBoxPositions) {
+        iconBoxPositions[city] = [];
+        tempBoxPositions[city].forEach(pos => {
+          iconBoxPositions[city].push({ left: pos.left, top: pos.top + 100 });
+        });
+      }
+      for (let city in iconBoxManualPositions) {
+        if (iconBoxManualPositions.hasOwnProperty(city)) {
+          iconBoxPositions[city] = iconBoxManualPositions[city];
+        }
+      }
+
+      async function fetchForecastForCity(cityId) {
+        try {
+          const coords = cityCoordinates[cityId];
+          if (!coords) throw new Error("Coordinates not defined for " + cityId);
+          const pointsUrl = `https://api.weather.gov/points/${coords.lat},${coords.lon}`;
+          const pointsResponse = await fetch(pointsUrl, { headers: { "User-Agent": "YourApp/1.0" } });
+          const pointsData = await pointsResponse.json();
+          const forecastUrl = pointsData.properties.forecast;
+          const forecastResponse = await fetch(forecastUrl, { headers: { "User-Agent": "YourApp/1.0" } });
+          const forecastData = await forecastResponse.json();
+          const periods = forecastData.properties.periods;
+          let dayForecasts = [];
+          for (let period of periods) {
+            if (!period.name.toLowerCase().includes("night")) {
+              dayForecasts.push({ 
+                temperature: period.temperature, 
+                icon: period.icon, 
+                shortForecast: period.shortForecast,
+                pop: (period.probabilityOfPrecipitation && period.probabilityOfPrecipitation.value != null)
+                      ? period.probabilityOfPrecipitation.value
+                      : 0
+              });
+              if (dayForecasts.length === 2) break;
+            }
+          }
+          console.log(`Forecast for ${cityId}:`, dayForecasts);
+          return dayForecasts;
+        } catch (error) {
+          console.error("Error fetching forecast for", cityId, error);
+          return [
+            { temperature: 0, icon: "", shortForecast: "", pop: 0 },
+            { temperature: 0, icon: "", shortForecast: "", pop: 0 }
+          ];
+        }
+      }
+
+      async function updateForecastForCity(cityId) {
+        try {
+          const forecasts = await fetchForecastForCity(cityId);
+          document.querySelectorAll(`div.temp-box[data-id^="${cityId}-temp-"]`).forEach((box, index) => {
+            const tempValue = box.querySelector('.temp-value');
+            if (tempValue) {
+              tempValue.textContent = (forecasts[index] && forecasts[index].temperature !== undefined)
+                                        ? forecasts[index].temperature
+                                        : "";
+            }
+          });
+          document.querySelectorAll(`div.icon-box[data-id^="${cityId}-icon-"]`).forEach((box, index) => {
+            const img = box.querySelector('img');
+            if (img && !box.manualOverride) {
+              const description = (forecasts[index] && forecasts[index].shortForecast)
+                                    ? forecasts[index].shortForecast.toLowerCase()
+                                    : "";
+              let mappedIcon = defaultIcon;
+              for (const key in customIconMapping) {
+                if (description.includes(key)) {
+                  mappedIcon = customIconMapping[key];
+                  break;
+                }
+              }
+              img.src = mappedIcon;
+            }
+          });
+          // Update POP boxes only if they are not manually overridden.
+          document.querySelectorAll(`div.pop-box[data-id^="${cityId}-pop-"]`).forEach((box, index) => {
+            if (!box.manualOverride) {
+              const popVal = forecasts[index] && forecasts[index].pop;
+              box.textContent = (popVal || popVal === 0) ? popVal + "%" : "";
+            }
+          });
+        } catch (error) {
+          console.error("Error updating forecast for", cityId, error);
+        }
+      }
+
+      function updateAllForecasts() {
+        Object.keys(cityCoordinates).forEach(cityId => {
+          updateForecastForCity(cityId);
+        });
+      }
+      updateAllForecasts();
+      setInterval(updateAllForecasts, 60000);
+
+      // Create and attach city dropdown (for updating city coordinates)
+      const mainDropdown = document.getElementById('main-dropdown');
+      document.querySelectorAll('.city-header').forEach(header => {
+        header.addEventListener('mouseenter', e => {
+          // Set the currentCityId based on the parent .city element
+          const cityElem = header.closest('.city');
+          currentCityId = Array.from(cityElem.classList).find(c => c !== "city" && c.startsWith("city"));
+          
+          const rect = header.getBoundingClientRect();
+          mainDropdown.style.left = cityElem.getBoundingClientRect().left + 'px';
+          mainDropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+          mainDropdown.style.display = 'block';
+        });
+        header.addEventListener('mouseleave', () => {
+          setTimeout(() => {
+            if (!mainDropdown.matches(':hover')) {
+              mainDropdown.style.display = 'none';
+            }
+          }, 200);
+        });
+      });
+      mainDropdown.addEventListener('mouseleave', () => {
+        mainDropdown.style.display = 'none';
+      });
+      document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', e => {
+          const selectedCityName = item.textContent.trim().toLowerCase();
+          if (currentCityId && availableCityCoordinates[selectedCityName]) {
+            cityCoordinates[currentCityId] = availableCityCoordinates[selectedCityName];
+            const cityHeader = document.querySelector(`.${currentCityId} .city-header .city-name`);
+            if (cityHeader) {
+              cityHeader.textContent = selectedCityName.toUpperCase();
+            }
+            updateForecastForCity(currentCityId);
+          }
+          mainDropdown.style.display = 'none';
+          e.stopPropagation();
+        });
+      });
+
+      function updateDayBoxesContent() {
+        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+        const dayAfter = new Date(now);
+        dayAfter.setDate(now.getDate() + 2);
+        const tomorrowName = dayNames[tomorrow.getDay()];
+        const dayAfterName = dayNames[dayAfter.getDay()];
+        document.querySelectorAll('.day-box').forEach(box => {
+          if (box.getAttribute('data-day') === "0") {
+            box.textContent = tomorrowName;
+          } else if (box.getAttribute('data-day') === "1") {
+            box.textContent = dayAfterName;
+          }
+        });
+      }
+      updateDayBoxesContent();
+      setInterval(updateDayBoxesContent, 0);
+
+      const dayBoxPositions = {
+        "city1": [ { left: 140.711, top: 154.527 }, { left: 309.83, top: 154.527 } ],
+        "city2": [ { left: 521.4, top: 154.527 }, { left: 685.097, top: 154.527 } ],
+        "city3": [ { left: 901.371, top: 154.527 }, { left: 1068.83, top: 154.527 } ],
+        "city4": [ { left: 1278.41, top: 154.527 }, { left: 1450.97, top: 154.527 } ],
+        "city5": [ { left: 140.711, top: 496.371 }, { left: 310.446, top: 496.371 } ],
+        "city6": [ { left: 521.4, top: 496.371 }, { left: 691.6, top: 496.371 } ],
+        "city7": [ { left: 901.371, top: 496.371 }, { left: 1068.83, top: 496.371 } ],
+        "city8": [ { left: 1278.41, top: 496.371 }, { left: 1450.97, top: 496.371 } ]
+      };
+
+      function createDayBoxes() {
+        document.querySelectorAll('.city').forEach(city => {
+          const cityId = Array.from(city.classList).find(c => c !== "city" && c.startsWith("city"));
+          const positions = dayBoxPositions[cityId];
+          const rect = city.getBoundingClientRect();
+          for (let d = 0; d < 2; d++) {
+            const box = document.createElement('div');
+            box.classList.add('day-box');
+            box.setAttribute('data-day', d);
+            const uniqueId = cityId + '-' + d;
+            box.setAttribute('data-id', uniqueId);
+            let initialLeft, initialTop;
+            if (positions && positions[d]) {
+              initialLeft = positions[d].left;
+              initialTop = positions[d].top;
+            } else {
+              const defaultOffsetX = 0, defaultOffsetY = 70;
+              initialLeft = rect.left + defaultOffsetX + (d * 50);
+              initialTop = rect.top + defaultOffsetY;
+            }
+            box.style.left = initialLeft + 'px';
+            box.style.top = initialTop + 'px';
+            container.appendChild(box);
+            makeDraggable(box);
+            attachTooltip(box);
+          }
+        });
+      }
+      createDayBoxes();
+
+      function createTempBoxes() {
+        document.querySelectorAll('.city').forEach(city => {
+          const cityId = Array.from(city.classList).find(c => c !== "city" && c.startsWith("city"));
+          const positions = tempBoxPositions[cityId];
+          const rect = city.getBoundingClientRect();
+          for (let d = 0; d < 2; d++) {
+            const box = document.createElement('div');
+            box.classList.add('temp-box', 'glow1');
+            box.setAttribute('data-day', d);
+            const uniqueId = cityId + '-temp-' + d;
+            box.setAttribute('data-id', uniqueId);
+            let initialLeft, initialTop;
+            if (positions && positions[d]) {
+              initialLeft = positions[d].left;
+              initialTop = positions[d].top;
+            } else {
+              const defaultOffsetX = 0, defaultOffsetY = 70;
+              initialLeft = rect.left + defaultOffsetX + (d * 50);
+              initialTop = rect.top + defaultOffsetY;
+            }
+            box.style.left = initialLeft + 'px';
+            box.style.top = initialTop + 'px';
+            const tempSpan = document.createElement('span');
+            tempSpan.classList.add('temp-value');
+            tempSpan.textContent = "";
+            box.appendChild(tempSpan);
+            box.addEventListener("click", () => {
+              const newTemp = prompt("Enter override temperature:", tempSpan.textContent);
+              if (newTemp !== null) {
+                tempSpan.textContent = newTemp;
+              }
+            });
+            container.appendChild(box);
+            makeDraggable(box);
+            attachTooltip(box);
+          }
+        });
+      }
+      createTempBoxes();
+
+      const popBoxPositions = {
+        "city1": [ { left: 143.9, top: 398.917 }, { left: 312.405, top: 398.917 } ],
+        "city2": [ { left: 516.143, top: 398.917 }, { left: 685.879, top: 398.9174 } ],
+        "city3": [ { left: 898.267, top: 398.917 }, { left: 1069.5, top: 398.917 } ],
+        "city4": [ { left: 1282.8, top: 398.917 }, { left: 1449.21, top: 398.917 } ],
+        "city5": [ { left: 143.9, top: 739 }, { left: 312.405, top: 739 } ],
+        "city6": [ { left: 516.143, top: 739 }, { left: 685.879, top: 739 } ],
+        "city7": [ { left: 898.267, top: 739 }, { left: 1069.5, top: 739 } ],
+        "city8": [ { left: 1282.8, top: 739 }, { left: 1449.21, top: 739 } ]
+      };
+
+      function createPopBoxes() {
+        document.querySelectorAll('.city').forEach(city => {
+          const cityId = Array.from(city.classList).find(c => c !== "city" && c.startsWith("city"));
+          const positions = popBoxPositions[cityId];
+          const rect = city.getBoundingClientRect();
+          for (let d = 0; d < 2; d++) {
+            const box = document.createElement('div');
+            box.classList.add('pop-box');
+            box.setAttribute('data-day', d);
+            const uniqueId = cityId + '-pop-' + d;
+            box.setAttribute('data-id', uniqueId);
+            let initialLeft, initialTop;
+            if (positions && positions[d]) {
+              initialLeft = positions[d].left;
+              initialTop = positions[d].top;
+            } else {
+              initialLeft = rect.left + 50 + (d * 100);
+              initialTop = rect.top + 600;
+            }
+            box.style.left = initialLeft + 'px';
+            box.style.top = initialTop + 'px';
+            // Allow manual override for precipitation percentage.
+            box.addEventListener("click", () => {
+              const currentVal = box.textContent.replace("%", "") || "";
+              const newPop = prompt("Enter override precipitation percentage:", currentVal);
+              if (newPop !== null) {
+                box.textContent = newPop + "%";
+                box.manualOverride = true;
+              }
+            });
+            // Double-click clears manual override.
+            box.addEventListener("dblclick", () => {
+              box.manualOverride = false;
+            });
+            container.appendChild(box);
+            makeDraggable(box);
+            attachTooltip(box);
+          }
+        });
+      }
+      createPopBoxes();
+
+      function createIconBoxes() {
+        document.querySelectorAll('.city').forEach(city => {
+          const cityId = Array.from(city.classList).find(c => c !== "city" && c.startsWith("city"));
+          const positions = iconBoxPositions[cityId];
+          const rect = city.getBoundingClientRect();
+          for (let d = 0; d < 2; d++) {
+            const box = document.createElement('div');
+            box.classList.add('icon-box');
+            box.setAttribute('data-day', d);
+            const uniqueId = cityId + '-icon-' + d;
+            box.setAttribute('data-id', uniqueId);
+            let initialLeft, initialTop;
+            if (positions && positions[d]) {
+              initialLeft = positions[d].left;
+              initialTop = positions[d].top;
+            } else {
+              const defaultOffsetX = 0, defaultOffsetY = 200;
+              initialLeft = rect.left + defaultOffsetX + (d * 50);
+              initialTop = rect.top + defaultOffsetY;
+            }
+            box.style.left = initialLeft + 'px';
+            box.style.top = initialTop + 'px';
+            const img = document.createElement('img');
+            img.src = defaultIcon;
+            box.appendChild(img);
+            const dropdown = document.createElement('div');
+            dropdown.classList.add('icon-dropdown');
+            overrideIcons.forEach(iconName => {
+              const option = document.createElement('div');
+              option.classList.add('icon-dropdown-item');
+              option.textContent = iconName;
+              option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                img.src = iconName;
+                box.manualOverride = true;
+                // Leave the dropdown visible on hover.
+              });
+              dropdown.appendChild(option);
+            });
+            dropdown.style.left = '0px';
+            dropdown.style.top = '100%';
+            box.appendChild(dropdown);
+            box.addEventListener('dblclick', () => {
+              box.manualOverride = false;
+              updateForecastForCity(cityId);
+            });
+            box.addEventListener('contextmenu', (e) => {
+              e.preventDefault();
+              let currentLeft = parseInt(box.style.left, 10);
+              let currentTop = parseInt(box.style.top, 10);
+              let newLeft = prompt("Enter new left position (px):", currentLeft);
+              let newTop = prompt("Enter new top position (px):", currentTop);
+              if(newLeft !== null && newTop !== null) {
+                newLeft = parseInt(newLeft, 10);
+                newTop = parseInt(newTop, 10);
+                iconBoxPositions[cityId][d] = { left: newLeft, top: newTop };
+                box.style.left = newLeft + "px";
+                box.style.top = newTop + "px";
+                console.log(`Manually updated ${uniqueId}:`, iconBoxPositions[cityId][d]);
+              }
+            });
+            container.appendChild(box);
+            makeDraggable(box);
+            attachTooltip(box);
+          }
+        });
+      }
+      createIconBoxes();
+
+      function updateDayBoxesPositions() {
+        document.querySelectorAll('.day-box').forEach(box => {
+          const uniqueId = box.getAttribute('data-id');
+          const parts = uniqueId.split('-');
+          const cityId = parts[0];
+          const dayIndex = parseInt(parts[1], 10);
+          if (dayBoxPositions[cityId] && dayBoxPositions[cityId][dayIndex]) {
+            const pos = dayBoxPositions[cityId][dayIndex];
+            box.style.left = pos.left + 'px';
+            box.style.top = pos.top + 'px';
+          }
+        });
+      }
+      function updateTempBoxesPositions() {
+        document.querySelectorAll('.temp-box').forEach(box => {
+          const uniqueId = box.getAttribute('data-id');
+          const parts = uniqueId.split('-temp-');
+          const cityId = parts[0];
+          const dayIndex = parseInt(parts[1], 10);
+          if (tempBoxPositions[cityId] && tempBoxPositions[cityId][dayIndex]) {
+            const pos = tempBoxPositions[cityId][dayIndex];
+            box.style.left = pos.left + 'px';
+            box.style.top = pos.top + 'px';
+          }
+        });
+      }
+      function updatePopBoxesPositions() {
+        document.querySelectorAll('.pop-box').forEach(box => {
+          const uniqueId = box.getAttribute('data-id');
+          const parts = uniqueId.split('-pop-');
+          const cityId = parts[0];
+          const dayIndex = parseInt(parts[1], 10);
+          if (popBoxPositions[cityId] && popBoxPositions[cityId][dayIndex]) {
+            const pos = popBoxPositions[cityId][dayIndex];
+            box.style.left = pos.left + 'px';
+            box.style.top = pos.top + 'px';
+          }
+        });
+      }
+      function updateIconBoxesPositions() {
+        document.querySelectorAll('.icon-box').forEach(box => {
+          const uniqueId = box.getAttribute('data-id');
+          const parts = uniqueId.split('-icon-');
+          const cityId = parts[0];
+          const dayIndex = parseInt(parts[1], 10);
+          if (iconBoxPositions[cityId] && iconBoxPositions[cityId][dayIndex]) {
+            const pos = iconBoxPositions[cityId][dayIndex];
+            box.style.left = pos.left + 'px';
+            box.style.top = pos.top + 'px';
+          }
+        });
+      }
+
+      // Modified dragging: convert pointer coordinates into container coordinates
+      function makeDraggable(el) {
+        let active = false, offsetX = 0, offsetY = 0;
+        el.addEventListener('pointerdown', dragStart);
+        function dragStart(e) {
+          if (e.target.closest('.dropdown') || e.target.closest('.icon-dropdown')) return;
+          e.preventDefault();
+          active = true;
+          let computedStyle = window.getComputedStyle(el);
+          let currentCenter = parseFloat(computedStyle.left);
+          offsetX = e.clientX - currentCenter;
+          offsetY = e.clientY - el.getBoundingClientRect().top;
+          el.setPointerCapture(e.pointerId);
+          window.addEventListener('pointermove', dragging);
+          window.addEventListener('pointerup', dragEnd);
+          window.addEventListener('pointercancel', dragEnd);
+        }
+        function dragging(e) {
+          if (!active) return;
+          e.preventDefault();
+          const newLeft = (e.clientX - offsetX) / currentScale;
+          const newTop  = (e.clientY - offsetY) / currentScale;
+          el.style.left = newLeft + 'px';
+          el.style.top  = newTop + 'px';
+          updateTooltip(el);
+        }
+        function dragEnd(e) {
+          if (!active) return;
+          if (el.classList.contains('day-box')) {
+            const uniqueId = el.getAttribute('data-id');
+            const parts = uniqueId.split('-');
+            const cityId = parts[0];
+            const dayIndex = parseInt(parts[1], 10);
+            dayBoxPositions[cityId][dayIndex] = {
+              left: parseInt(el.style.left, 10),
+              top: parseInt(el.style.top, 10)
+            };
+            console.log(`Updated ${uniqueId}:`, dayBoxPositions[cityId][dayIndex]);
+          } else if (el.classList.contains('temp-box')) {
+            const uniqueId = el.getAttribute('data-id');
+            const parts = uniqueId.split('-temp-');
+            const cityId = parts[0];
+            const dayIndex = parseInt(parts[1], 10);
+            tempBoxPositions[cityId][dayIndex] = {
+              left: parseInt(el.style.left, 10),
+              top: parseInt(el.style.top, 10)
+            };
+            console.log(`Updated ${uniqueId}:`, tempBoxPositions[cityId][dayIndex]);
+          } else if (el.classList.contains('pop-box')) {
+            const uniqueId = el.getAttribute('data-id');
+            const parts = uniqueId.split('-pop-');
+            const cityId = parts[0];
+            const dayIndex = parseInt(parts[1], 10);
+            popBoxPositions[cityId][dayIndex] = {
+              left: parseInt(el.style.left, 10),
+              top: parseInt(el.style.top, 10)
+            };
+            console.log(`Updated ${uniqueId}:`, popBoxPositions[cityId][dayIndex]);
+          } else if (el.classList.contains('icon-box')) {
+            const uniqueId = el.getAttribute('data-id');
+            const parts = uniqueId.split('-icon-');
+            const cityId = parts[0];
+            const dayIndex = parseInt(parts[1], 10);
+            iconBoxPositions[cityId][dayIndex] = {
+              left: parseInt(el.style.left, 10),
+              top: parseInt(el.style.top, 10)
+            };
+            console.log(`Updated ${uniqueId}:`, iconBoxPositions[cityId][dayIndex]);
+          }
+          active = false;
+          el.releasePointerCapture(e.pointerId);
+          window.removeEventListener('pointermove', dragging);
+          window.removeEventListener('pointerup', dragEnd);
+          window.removeEventListener('pointercancel', dragEnd);
+        }
+      }
+      document.querySelectorAll('.city, .day-box, .temp-box, .pop-box, .icon-box').forEach(makeDraggable);
+
+      const tooltip = document.getElementById('tooltip');
+      function updateTooltip(el) {
+        tooltip.textContent = 'Left: ' + el.style.left + ' | Top: ' + el.style.top;
+      }
+      function attachTooltip(el) {
+        el.addEventListener('mouseenter', e => {
+          updateTooltip(el);
+          tooltip.style.display = 'block';
+          positionTooltip(e);
+        });
+        el.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+        el.addEventListener('mousemove', e => {
+          positionTooltip(e);
+        });
+      }
+      document.querySelectorAll('.city, .day-box, .temp-box, .pop-box, .icon-box').forEach(attachTooltip);
+      function positionTooltip(e) {
+        const x = e.clientX || (e.touches && e.touches[0].clientX);
+        const y = e.clientY || (e.touches && e.touches[0].clientY);
+        tooltip.style.left = (x + 10) + 'px';
+        tooltip.style.top = (y + 10) + 'px';
+      }
+
+      // SAVE OPTION: Right-click on the container saves a screenshot (no Shift required)
+      container.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        html2canvas(container).then(canvas => {
+          const link = document.createElement('a');
+          link.download = 'forecast_overlay.png';
+          link.href = canvas.toDataURL();
+          link.click();
+        });
+      });
+    });
+  </script>
+</body>
+</html>
